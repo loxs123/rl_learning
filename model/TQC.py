@@ -29,6 +29,8 @@ class TQCEnvSwitchWrapper(TQC):
         # get VecNormalize object if needed
         self._vec_normalize_env = unwrap_vec_normalize(env)
         
+        if issubclass(self.replay_buffer_class, HerReplayBuffer):
+            self.replay_buffer.set_env(env)
         # # Make a local copy as we should not pickle
         # # the environment when using HerReplayBuffer
         # replay_buffer_kwargs = self.replay_buffer_kwargs.copy()
