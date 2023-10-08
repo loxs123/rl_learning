@@ -15,17 +15,23 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from model import TQCEnvSwitchWrapper
 from utils import get_push_env
 
-def train():
-    env_id = "PandaPush-v3"
-    log_dir = './panda_push_v3_tensorboard/'
+import argparse
+import numpy
+
+def train(args):
+    env_id = args.domain_name
+    # log_dir = './panda_push_v3_tensorboard/'
+    log_dir = './' + args.domain_name + '_tensorboard_tqc/'
+
+    env_int = numpy.random.randint(low=args.random_int[0], high=args.random_int[1], size=4, dtype='l')
 
     # env for train
-    env1 = get_push_env()
-    env2 = get_push_env(1.0, 0.001,2.0)
-    env3 = get_push_env(1.0, 0.001,3.0)
-    env4 = get_push_env(1.0, 0.001,4.0)
+    env1 = get_push_env(1.0, 0.001, env_int[0])
+    env2 = get_push_env(1.0, 0.001, env_int[1])
+    env3 = get_push_env(1.0, 0.001, env_int[2])
+    env4 = get_push_env(1.0, 0.001, env_int[3])
     # env for test
-    env5 = get_push_env(1.0, 0.001,20)
+    env5 = get_push_env(1.0, 0.001,args.test_mass)
 
     train_env = DummyVecEnv([env1,env2,env3,env4])
     test_env = DummyVecEnv([env5,env5,env5,env5])
@@ -52,20 +58,21 @@ def train():
                             verbose=1,
                             tensorboard_log=log_dir)
 
-    model.learn(total_timesteps=2_000_000,progress_bar=True)
+    model.learn(total_timesteps=args.time_step,progress_bar=True)
     train_env.close()
 
     # save_model
-    model_name = "TQC-PandaPush-v3"
+    model_name = "TQC-" + str(args.domain_name + "-test-" + str(args.test_mass))
     model.save(model_name)
-    model.save_replay_buffer('TQC-PandaPush-v3-buffer')
+    model.save_replay_buffer('TQC-' + str(args.domain_name) + '-buffer' + "-test-" + str(args.test_mass))
     # train_env.save(f"{model_name}_vec_normalize.pkl")
 
     # switch environment
-    model.reset_env(test_env)
+    model2 = TQCEnvSwitchWrapper.load(model_name,env=test_env)
+    model2.eval_env = True
 
-    # SAC test model
-    model.learn(total_timesteps=2_000_000,progress_bar=True)
+    model2.learn(total_timesteps=args.time_step,progress_bar=True)
+
     test_env.close()
 
 
@@ -104,4 +111,12 @@ def retrain():
 
     test_env.close()
 
-train()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--domain_name', default='PandaPush-v3')
+    parser.add_argument('--random_int', default=[1, 2, 3, 4], nargs='+', type=int)
+    parser.add_argument('--test_mass', default=100, type=int)
+    parser.add_argument('--time_step', default=800000, type=int)
+    args = parser.parse_args()
+
+    train(args)
